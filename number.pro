@@ -6,7 +6,8 @@ QMAKE_CFLAGS += -std=c11
 
 SOURCES += main.c \
     lib/cexception/CException.c \
-    list_string.c
+    list_string.c \
+    number.c
 
 DISTFILES += \
     lib/cexception/LICENSE.txt \
