@@ -13,11 +13,23 @@ extern "C" {
 #include <stdlib.h>
 
 
+typedef enum Bool {
+    False,
+    True
+} Bool;
+
+
 cclass_(Number) {
     /* fields */
-    _Bool           _is_negative;
+    Bool            _is_negative;
+    Bool            _is_approximate;
+    Bool            _is_exp_negative;
+    Bool            _has_period;
+    Bool            _has_endless_fract;
     List(String)    _integer;
     List(String)    _fraction;
+    List(String)    _period;
+    List(String)    _exponent;
 
     /* methods */
     method_def_(Number,     add,            Number) with_(Number other);
@@ -27,21 +39,23 @@ cclass_(Number) {
     method_def_(Number,     mod,            Number) with_(Number other);
     method_def_(Number,     pow,            Number) with_(Number other);
 
-    method_def_(_Bool,      e,              Number) with_(Number other);
-    method_def_(_Bool,      ne,             Number) with_(Number other);
-    method_def_(_Bool,      lt,             Number) with_(Number other);
-    method_def_(_Bool,      let,            Number) with_(Number other);
-    method_def_(_Bool,      mt,             Number) with_(Number other);
-    method_def_(_Bool,      met,            Number) with_(Number other);
+    method_def_(Bool,       e,              Number) with_(Number other);
+    method_def_(Bool,       ne,             Number) with_(Number other);
+    method_def_(Bool,       lt,             Number) with_(Number other);
+    method_def_(Bool,       let,            Number) with_(Number other);
+    method_def_(Bool,       mt,             Number) with_(Number other);
+    method_def_(Bool,       met,            Number) with_(Number other);
 
-    method_def_(_Bool,      is_negative,    Number) without_args;
-    method_def_(_Bool,      is_integer,     Number) without_args;
+    method_def_(Bool,       is_negative,    Number) without_args;
+    method_def_(Bool,       is_integer,     Number) without_args;
     method_def_(Number,     integer,        Number) without_args;
     method_def_(Number,     fraction,       Number) without_args;
 };
 
 constructor_(Number)(const String number_in_string);
 destructor_(Number);
+
+void print_number(Number number);
 
 
 #ifdef __cplusplus
