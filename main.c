@@ -19,37 +19,45 @@ int main() {
 //    Number g = new_Number("~3.14");                 // approximate value
 //    Number h = new_Number("~-1_000_000`000.999");   // all inclusive
 
-    printf("a = ");
-    print_number(a);
+//    printf("a = ");
+//    print_number(a);
+//    puts("");
+
+//    printf("b = ");
+//    print_number(b);
+//    puts("");
+
+//    printf("c = ");
+//    print_number(c);
+//    puts("");
+
+//    printf("d = ");
+//    print_number(d);
+//    puts("");
+
+//    printf("e = ");
+//    print_number(e);
+//    puts("");
+
+//    printf("f = ");
+//    print_number(f);
+//    puts("");
+
+    printf("g = ");
+    print_number(g);
     puts("");
 
-    printf("b = ");
-    print_number(b);
-    puts("");
-
-    printf("c = ");
-    print_number(c);
-    puts("");
-
-    printf("d = ");
-    print_number(d);
-    puts("");
-
-    printf("e = ");
-    print_number(e);
-    puts("");
-
-    printf("f = ");
-    print_number(f);
-    puts("");
+//    printf("h = ");
+//    print_number(h);
+//    puts("");
 
     printf("i = ");
     print_number(i);
     puts("");
 
-    printf("j = ");
-    print_number(j);
-    puts("");
+//    printf("j = ");
+//    print_number(j);
+//    puts("");
 
 //    print_number(g);
 //    print_number(h);

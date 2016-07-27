@@ -4,6 +4,58 @@
 #include <ctype.h>
 
 
+static size_t _has_fraction(const charptr source, size_t begin, size_t end) {
+    size_t pos = 0;
+
+    for (size_t i = begin; i < end; i++) {
+        if (source[i] == '.') {
+            pos = i + 1;
+            break;
+        }
+    }
+
+    return pos;
+}
+
+
+static void _init_integer_part(Number number, const charptr source, size_t begin, size_t end) {
+    int     _end = (int) end;
+    int     _begin = (int) begin;
+    int     _length;
+    int     _rem;
+    charptr _segment;
+
+    for (int i = _end; i >= _begin; i -= 4) {
+        _segment = (charptr) malloc(sizeof(char) * 5);
+        _length = i - _begin + 1;
+
+        if (_length / 4 != 0) {
+            _segment[0] = source[i - 3];
+            _segment[1] = source[i - 2];
+            _segment[2] = source[i - 1];
+            _segment[3] = source[i];
+        } else {    // this is last `segment`
+            _segment[0] = '0';
+            _rem = _length % 4;
+
+            if (_rem > 1) {
+                _segment[1] = (_rem == 3) ? source[i - 2] : '0';
+                _segment[2] = source[i - 1];
+            } else {
+                _segment[1] = '0';
+                _segment[2] = '0';
+            }
+
+            _segment[3] = source[i];
+        }
+
+        _segment[4] = '\0';
+
+        number->_integer->push_front(number->_integer, _segment);
+    }
+}
+
+
 static Bool _add_four_digits(charptr res, const charptr op_1, const charptr op_2, Bool last_overflow) {
     // annotation: memory for `res` has to be allocated!
     const int   MAX_COUNT = 6;
@@ -224,74 +276,25 @@ static void _number_len_6_and_more(Number number, const charptr source, size_t l
         return;
     }
 
+    j = _has_fraction(source, i, len - 1);
 
-    for (size_t k = i; k < len - 1; k++) {
-        if (source[k] == '.') {
-            j = k + 1;
-            break;
-        }
-    }
-
-
-    if (j) {    // if `source` has a fraction part. otherwise it hasn't or we don't know yet
+    // Now we can define the integer part, starting from the end of it.
+    if (j) {    // if `source` has a fraction part
         /*
-         * `j`               - position in `source` where fraction part begins
-         * `j - 1`           - position in which `source[j - 1]` == '.'
-         * `j - 2`           - position, where integer part of number ends
-         * `(j - 2) - i + 1` - length of integer part
-         *
-         * Now we can define the integer part, starting from the end of it.
+         * `i`     - position in `source` where integer part begins
+         * `j`     - position in `source` where fraction part begins
+         * `j - 1` - position in which `source[j - 1]` == '.'
+         * `j - 2` - position, where integer part of number ends
          */
-        int iend = j - 2;
-
-        for (int k = iend; k >= (int) i; k -= 4) {
-            segment = (charptr) malloc(sizeof(char) * 5);
-
-            // `(j - 2) - k + 1` - integer part of the number that isn't in `number->_integer` yet
-
-            if ((k - i + 1) / 4 != 0) {
-                segment[0] = source[k - 3];
-                segment[1] = source[k - 2];
-                segment[2] = source[k - 1];
-                segment[3] = source[k];
-            } else {    // this is last `segment`
-                segment[0] = '0';
-
-                switch ((k - i + 1) % 4) {
-                    case 3:
-                        segment[1] = source[k - 2];
-                        segment[2] = source[k - 1];
-                        segment[3] = source[k];
-                        break;
-
-                    case 2:
-                        segment[1] = '0';
-                        segment[2] = source[k - 1];
-                        segment[3] = source[k];
-                        break;
-
-                    case 1:
-                        segment[1] = '0';
-                        segment[2] = '0';
-                        segment[3] = source[k];
-                        break;
-
-                    default:
-                        /* otherwise,  `(j - k - 1) % 4` == 0 => `(j - k - 1) / 4 != 0`*/
-                        break;
-                }
-            }
-
-            segment[4] = '\0';
-
-            printf("%s\n", segment);
-            printf("%c %c\n", source[9], source[j-3]);
-
-            number->_integer->push_front(number->_integer, segment);
-        }
+        _init_integer_part(number, source, i, j - 2);
+    } else {    // else the `number` hasn't fraction part
+        /*
+         * `i` - position in `source` where integer part begins
+         * `len` - length of `source`
+         * `len - 1` - position in `source` where integer part ends
+         */
+        _init_integer_part(number, source, i, len - 1);
     }
-
-    printf("i = %d\n", i);
 }
 
 
