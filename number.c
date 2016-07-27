@@ -102,39 +102,40 @@ static Bool _add_four_digits(charptr res, const charptr op_1, const charptr op_2
 }
 
 
-static void _init_number(Number number, const charptr source, size_t len) {
+static void _init_number(Number number, const charptr source, size_t length) {
     charptr segment;
-    size_t  i = 0;      // position in `source`, where integer part begins
-    size_t  j = 0;      // position in `source`, where fraction part begins
+    size_t  int_pos = 0;    // position in `source`, where integer part begins
+    size_t  fract_pos = 0;  // position in `source`, where fraction part begins
+    size_t  exp_pos = 0;    // position in `source`, where exponent part begins
 
-    if (source[i] == '~') {
+    if (source[int_pos] == '~') {
         number->_is_approximate = True;
-        i++;
+        int_pos++;
     } else {
         number->_is_approximate = False;
     }
 
-    if (source[i] == '+') {
+    if (source[int_pos] == '+') {
         number->_is_negative = False;
-        i++;
-    } else if (source[i] == '-') {
+        int_pos++;
+    } else if (source[int_pos] == '-') {
         number->_is_negative = True;
-        i++;
+        int_pos++;
     } else {
         number->_is_negative = False;
     }
 
-    for (size_t k = i; k < len; k++) {
-        if (source[k] == '0') {
-            i++;
-        } else if (source[k] == '.') {      // 0.nnnnnn
-            j = k + 1;  // fration part begins here
-            i--;
+    for (size_t i = int_pos; i < length; i++) {
+        if (source[i] == '0') {
+            int_pos++;
+        } else if (source[i] == '.') {      // 0.nnnnnn
+            fract_pos = i + 1;  // fration part begins here
+            int_pos--;
             break;
         } else {
             break;
         }
-    } if (i == len) {
+    } if (int_pos == length) {
         /*
          * `source` can be:
          * -- "000000000...0"
@@ -156,7 +157,7 @@ static void _init_number(Number number, const charptr source, size_t len) {
         segment[0] = '0';
         segment[1] = '0';
         segment[2] = '0';
-        segment[3] = source[i - 1];
+        segment[3] = source[int_pos - 1];
         segment[4] = '\0';
 
         number->_integer->push_front(number->_integer, segment);
@@ -164,24 +165,24 @@ static void _init_number(Number number, const charptr source, size_t len) {
         return;
     }
 
-    j = _has_fraction(source, i, len - 1);
+    fract_pos = (!fract_pos) ? _has_fraction(source, int_pos, length - 1) : 0;
 
     // Now we can define the integer part, starting from the end of it.
-    if (j) {    // if `source` has a fraction part
+    if (fract_pos) {    // if `source` has a fraction part
         /*
-         * `i`     - position in `source` where integer part begins
-         * `j`     - position in `source` where fraction part begins
-         * `j - 1` - position in which `source[j - 1]` == '.'
-         * `j - 2` - position, where integer part of number ends
+         * `int_pos`       - position in `source` where integer part begins
+         * `fract_pos`     - position in `source` where fraction part begins
+         * `fract_pos - 1` - position in which `source[j - 1]` == '.'
+         * `fract_pos - 2` - position, where integer part of `number` ends
          */
-        _init_integer_part(number, source, i, j - 2);
+        _init_integer_part(number, source, int_pos, fract_pos - 2);
     } else {    // else the `number` hasn't fraction part
         /*
-         * `i` - position in `source` where integer part begins
-         * `len` - length of `source`
-         * `len - 1` - position in `source` where integer part ends
+         * `int_pos`    - position in `source` where integer part begins
+         * `length`     - length of `source`
+         * `length - 1` - position in `source` where integer part ends
          */
-        _init_integer_part(number, source, i, len - 1);
+        _init_integer_part(number, source, int_pos, length - 1);
     }
 }
 
