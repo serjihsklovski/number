@@ -18,6 +18,22 @@ static size_t _has_fraction(const charptr source, size_t begin, size_t end) {
 }
 
 
+static size_t _remove_separators(charptr destination, const charptr source, size_t length) {
+    size_t new_length = 0;
+
+    for (size_t i = 0; i < length; i++) {
+        if (source[i] == '_') {
+            continue;
+        } else {
+            destination[new_length] = source[i];
+            new_length++;
+        }
+    }
+
+    return new_length;
+}
+
+
 static void _init_integer_part(Number number, const charptr source, size_t begin, size_t end) {
     int     _end = (int) end;
     int     _begin = (int) begin;
@@ -34,7 +50,7 @@ static void _init_integer_part(Number number, const charptr source, size_t begin
             _segment[1] = source[i - 2];
             _segment[2] = source[i - 1];
             _segment[3] = source[i];
-        } else {    // this is last `segment`
+        } else {    // this is last `_segment`
             _segment[0] = '0';
             _rem = _length % 4;
 
@@ -86,141 +102,7 @@ static Bool _add_four_digits(charptr res, const charptr op_1, const charptr op_2
 }
 
 
-static void _number_len_1(Number number, const charptr source) {
-    /*
-     * If `len` == 1, then `number_in_string` holds only one digit (0-9),
-     * without any extra characters ('+', '-', '~', and so on). Otherwise,
-     * it's not a Number literal at all.
-     */
-
-    number->_is_negative = False;
-    number->_is_approximate = False;
-    number->_is_exp_negative = False;
-    number->_has_period = False;
-    number->_has_endless_fract = False;
-
-    charptr segment = (charptr) malloc(sizeof(char) * 5);
-
-    segment[0] = '0';
-    segment[1] = '0';
-    segment[2] = '0';
-    segment[3] = source[0];
-    segment[4] = '\0';
-
-    number->_integer->push_front(number->_integer, segment);
-}
-
-
-static void _number_len_2(Number number, const charptr source) {
-    /*
-     * If `len` == 2, then `number_in_string` can contain extra characters
-     * at the beginning: '+', '-' or '~'. Sequence "-0"must be reduce to the "0".
-     */
-
-    number->_is_exp_negative = False;
-    number->_has_period = False;
-    number->_has_endless_fract = False;
-
-    charptr segment = (charptr) malloc(sizeof(char) * 5);
-
-    switch (source[0]) {
-        case '+':
-            number->_is_negative = False;
-            number->_is_approximate = False;
-            segment[0] = '0';
-            segment[1] = '0';
-            segment[2] = '0';
-            segment[3] = source[1];
-            break;
-
-        case '-':
-            number->_is_negative = (source[1] == '0') ? False : True;   // if `source` == "-0" => "0"
-            number->_is_approximate = False;
-            segment[0] = '0';
-            segment[1] = '0';
-            segment[2] = '0';
-            segment[3] = source[1];
-            break;
-
-        case '~':
-            number->_is_negative = False;
-            number->_is_approximate = True;
-            segment[0] = '0';
-            segment[1] = '0';
-            segment[2] = '0';
-            segment[3] = source[1];
-            break;
-
-        default:    // `source` == "10".."99"
-            number->_is_negative = False;
-            number->_is_approximate = False;
-            segment[0] = '0';
-            segment[1] = '0';
-            segment[2] = source[0];
-            segment[3] = source[1];
-            break;
-    }
-
-    segment[4] = '\0';
-
-    number->_integer->push_front(number->_integer, segment);
-}
-
-
-static void _number_len_3(Number number, const charptr source) {
-    /*
-     * If `len` >= 3, then `number_in_string` can be any of forms:
-     * -- integer:              "243"
-     * -- with '+':             "+10"
-     * -- negative:             "-56"
-     * -- real:                 "0.1"
-     * -- approximate:          "~12"
-     * -- approx. and negative: "~-2"
-     * -- scientific:           "2e5"
-     * -- with separator:       "1_0"
-     *
-     * Sequence "0.0" must be reduced to "0"
-     */
-
-    number->_is_exp_negative = False;
-    number->_has_period = False;
-    number->_has_endless_fract = False;
-
-    charptr segment = (charptr) malloc(sizeof(char) * 5);
-
-    size_t i = 0;   // position in `source`, where integer part begins
-    size_t j = 0;   // position in `source`, where fraction part begins
-
-    if (source[i] == '~') {
-        number->_is_approximate = True;
-        i++;
-    }
-
-    if (source[i] == '+') {
-        number->_is_negative = False;
-        i++;
-    } else if (source[i] == '-') {
-        number->_is_negative = True;
-        i++;
-    }
-
-    for (size_t k = i; k < 3; k++) {
-        //
-    }
-}
-
-
-static void _number_len_4(Number number, const charptr source) {
-    //
-}
-
-
-static void _number_len_5(Number number, const charptr source) {
-    //
-}
-
-
-static void _number_len_6_and_more(Number number, const charptr source, size_t len) {
+static void _init_number(Number number, const charptr source, size_t len) {
     charptr segment;
     size_t  i = 0;      // position in `source`, where integer part begins
     size_t  j = 0;      // position in `source`, where fraction part begins
@@ -228,6 +110,8 @@ static void _number_len_6_and_more(Number number, const charptr source, size_t l
     if (source[i] == '~') {
         number->_is_approximate = True;
         i++;
+    } else {
+        number->_is_approximate = False;
     }
 
     if (source[i] == '+') {
@@ -236,6 +120,8 @@ static void _number_len_6_and_more(Number number, const charptr source, size_t l
     } else if (source[i] == '-') {
         number->_is_negative = True;
         i++;
+    } else {
+        number->_is_negative = False;
     }
 
     for (size_t k = i; k < len; k++) {
@@ -249,7 +135,8 @@ static void _number_len_6_and_more(Number number, const charptr source, size_t l
             break;
         }
     } if (i == len) {
-        /* `source` can be:
+        /*
+         * `source` can be:
          * -- "000000000...0"
          * -- "+00000000...0"
          * -- "-00000000...0"
@@ -259,6 +146,7 @@ static void _number_len_6_and_more(Number number, const charptr source, size_t l
          *
          * These variants must be reduce to "0" or "~0"
          */
+        number->_is_negative = False;
         number->_is_exp_negative = False;
         number->_has_period = False;
         number->_has_endless_fract = False;
@@ -313,17 +201,19 @@ constructor_(Number)(const charptr number_in_string) {
     self->_period = new_(List_charptr)();
     self->_exponent = new_(List_charptr)();
 
-    size_t len = strlen(number_in_string);
+    size_t  len = strlen(number_in_string);
+    charptr num_in_str_without_sep = (charptr) malloc(sizeof(char) * len);
+    size_t  new_len = _remove_separators(num_in_str_without_sep, number_in_string, len);
 
     /*
-     * If `len` == 1, then `number_in_string` holds only one digit (0-9),
+     * If `new_len` == 1, then `num_in_str_without_sep` holds only one digit (0-9),
      * without any extra characters ('+', '-', '~', and so on). Otherwise,
      * it's not a Number literal at all.
      *
-     * If `len` == 2, then `number_in_string` can contain extra characters
-     * at the beginning: '+', '-' or '~'. Sequence "-0"must be reduce to the "0".
+     * If `new_len` == 2, then `num_in_str_without_sep` can contain extra characters
+     * at the beginning: '+', '-' or '~'. Sequence "-0" must be reduce to the "0".
      *
-     * If `len` >= 3, then `number_in_string` can be any of forms:
+     * If `new_len` >= 3, then `num_in_str_without_sep` can be any of forms:
      * -- integer:              "243"
      * -- with '+':             "+10"
      * -- negative:             "-56"
@@ -331,43 +221,19 @@ constructor_(Number)(const charptr number_in_string) {
      * -- approximate:          "~12"
      * -- approx. and negative: "~-2"
      * -- scientific:           "2e5"
-     * -- with separator:       "1_0"
      *
-     * If `len` >= 5, then `number_in_string` can contain fraction part
+     * If `new_len` >= 5, then `num_in_str_without_sep` can contain fraction part
      * with period: "0.(4)". Sequence "0.(0)" must be reduce to the "0".
      *
-     * If `len` >= 6, then `number_in_string` can contain endless fraction
+     * If `new_len` >= 6, then `num_in_str_without_sep` can contain endless fraction
      * part: "0.1...".
      *
-     * `number_in_string` can hold zeros at the beginning and at the end:
+     * `num_in_str_without_sep` can hold zeros at the beginning and at the end:
      * "04", "345.500", "-03". Sequence "-00000000" must be reduce to the "0".
      */
-    switch (len) {
-        case 1u:
-            _number_len_1(self, number_in_string);
-            break;
+    _init_number(self, num_in_str_without_sep, new_len);
 
-        case 2u:
-            _number_len_2(self, number_in_string);
-            break;
-
-        case 3u:
-            _number_len_3(self, number_in_string);
-            break;
-
-        case 4u:
-            _number_len_4(self, number_in_string);
-            break;
-
-        case 5u:
-            _number_len_5(self, number_in_string);
-            break;
-
-        default:
-            _number_len_6_and_more(self, number_in_string, len);
-            break;
-    }
-
+    free(num_in_str_without_sep);
     return self;
 }
 
