@@ -9,7 +9,10 @@ int main() {
     Number d = new_Number("-5");
     Number e = new_Number("79");
     Number f = new_Number("~4");
-//    Number c = new_Number("-4124532521");           // integer negative
+    Number g = new_Number("-4124532521");           // integer negative
+    Number h = new_Number("~-0000003242");
+    Number i = new_Number("~-003443563.1");
+    Number j = new_Number("~00000000000");
 //    Number d = new_Number("-235246.132467545");     // fraction negative
 //    Number e = new_Number("1_000_000.432");         // '_' separator
 //    Number f = new_Number("-1`000`000.999`999");    // '`' separator
@@ -40,6 +43,14 @@ int main() {
     print_number(f);
     puts("");
 
+    printf("i = ");
+    print_number(i);
+    puts("");
+
+    printf("j = ");
+    print_number(j);
+    puts("");
+
 //    print_number(g);
 //    print_number(h);
 
@@ -49,6 +60,10 @@ int main() {
     delete_Number(d);
     delete_Number(e);
     delete_Number(f);
+    delete_Number(g);
+    delete_Number(h);
+    delete_Number(i);
+    delete_Number(j);
 
     return 0;
 }

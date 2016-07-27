@@ -6,8 +6,8 @@ QMAKE_CFLAGS += -std=c11
 
 SOURCES += main.c \
     lib/cexception/CException.c \
-    list_string.c \
-    number.c
+    number.c \
+    list_charptr.c
 
 DISTFILES += \
     lib/cexception/LICENSE.txt \
@@ -19,4 +19,4 @@ HEADERS += \
     lib/template_list.h \
     error_codes.h \
     number.h \
-    list_string.h
+    list_charptr.h

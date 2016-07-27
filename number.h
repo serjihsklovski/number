@@ -9,7 +9,7 @@ extern "C" {
 #include "lib/cexception/CException.h"
 #include "lib/template_list.h"
 #include "error_codes.h"
-#include "list_string.h"
+#include "list_charptr.h"
 #include <stdlib.h>
 
 
@@ -26,10 +26,10 @@ cclass_(Number) {
     Bool            _is_exp_negative;
     Bool            _has_period;
     Bool            _has_endless_fract;
-    List(String)    _integer;
-    List(String)    _fraction;
-    List(String)    _period;
-    List(String)    _exponent;
+    List(charptr)   _integer;
+    List(charptr)   _fraction;
+    List(charptr)   _period;
+    List(charptr)   _exponent;
 
     /* methods */
     method_def_(Number,     add,            Number) with_(Number other);
@@ -52,7 +52,7 @@ cclass_(Number) {
     method_def_(Number,     fraction,       Number) without_args;
 };
 
-constructor_(Number)(const String number_in_string);
+constructor_(Number)(const charptr number_in_string);
 destructor_(Number);
 
 void print_number(Number number);

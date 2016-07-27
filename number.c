@@ -4,7 +4,7 @@
 #include <ctype.h>
 
 
-static Bool _add_four_digits(String res, const String op_1, const String op_2, Bool last_overflow) {
+static Bool _add_four_digits(charptr res, const charptr op_1, const charptr op_2, Bool last_overflow) {
     // annotation: memory for `res` has to be allocated!
     const int   MAX_COUNT = 6;
     char        buf[MAX_COUNT];
@@ -34,7 +34,7 @@ static Bool _add_four_digits(String res, const String op_1, const String op_2, B
 }
 
 
-static void _number_len_1(Number number, const String source) {
+static void _number_len_1(Number number, const charptr source) {
     /*
      * If `len` == 1, then `number_in_string` holds only one digit (0-9),
      * without any extra characters ('+', '-', '~', and so on). Otherwise,
@@ -47,7 +47,7 @@ static void _number_len_1(Number number, const String source) {
     number->_has_period = False;
     number->_has_endless_fract = False;
 
-    String segment = (String) malloc(sizeof(char) * 5);
+    charptr segment = (charptr) malloc(sizeof(char) * 5);
 
     segment[0] = '0';
     segment[1] = '0';
@@ -59,7 +59,7 @@ static void _number_len_1(Number number, const String source) {
 }
 
 
-static void _number_len_2(Number number, const String source) {
+static void _number_len_2(Number number, const charptr source) {
     /*
      * If `len` == 2, then `number_in_string` can contain extra characters
      * at the beginning: '+', '-' or '~'. Sequence "-0"must be reduce to the "0".
@@ -69,10 +69,9 @@ static void _number_len_2(Number number, const String source) {
     number->_has_period = False;
     number->_has_endless_fract = False;
 
-    String segment = (String) malloc(sizeof(char) * 5);
+    charptr segment = (charptr) malloc(sizeof(char) * 5);
 
     switch (source[0]) {
-        case '0':   // `source` == "0n" => "n"
         case '+':
             number->_is_negative = False;
             number->_is_approximate = False;
@@ -116,27 +115,187 @@ static void _number_len_2(Number number, const String source) {
 }
 
 
-static void _number_len_3(Number number, const String source) {
+static void _number_len_3(Number number, const charptr source) {
+    /*
+     * If `len` >= 3, then `number_in_string` can be any of forms:
+     * -- integer:              "243"
+     * -- with '+':             "+10"
+     * -- negative:             "-56"
+     * -- real:                 "0.1"
+     * -- approximate:          "~12"
+     * -- approx. and negative: "~-2"
+     * -- scientific:           "2e5"
+     * -- with separator:       "1_0"
+     *
+     * Sequence "0.0" must be reduced to "0"
+     */
+
+    number->_is_exp_negative = False;
+    number->_has_period = False;
+    number->_has_endless_fract = False;
+
+    charptr segment = (charptr) malloc(sizeof(char) * 5);
+
+    size_t i = 0;   // position in `source`, where integer part begins
+    size_t j = 0;   // position in `source`, where fraction part begins
+
+    if (source[i] == '~') {
+        number->_is_approximate = True;
+        i++;
+    }
+
+    if (source[i] == '+') {
+        number->_is_negative = False;
+        i++;
+    } else if (source[i] == '-') {
+        number->_is_negative = True;
+        i++;
+    }
+
+    for (size_t k = i; k < 3; k++) {
+        //
+    }
+}
+
+
+static void _number_len_4(Number number, const charptr source) {
     //
 }
 
 
-static void _number_len_4(Number number, const String source) {
+static void _number_len_5(Number number, const charptr source) {
     //
 }
 
 
-static void _number_len_5(Number number, const String source) {
-    //
+static void _number_len_6_and_more(Number number, const charptr source, size_t len) {
+    charptr segment;
+    size_t  i = 0;      // position in `source`, where integer part begins
+    size_t  j = 0;      // position in `source`, where fraction part begins
+
+    if (source[i] == '~') {
+        number->_is_approximate = True;
+        i++;
+    }
+
+    if (source[i] == '+') {
+        number->_is_negative = False;
+        i++;
+    } else if (source[i] == '-') {
+        number->_is_negative = True;
+        i++;
+    }
+
+    for (size_t k = i; k < len; k++) {
+        if (source[k] == '0') {
+            i++;
+        } else if (source[k] == '.') {      // 0.nnnnnn
+            j = k + 1;  // fration part begins here
+            i--;
+            break;
+        } else {
+            break;
+        }
+    } if (i == len) {
+        /* `source` can be:
+         * -- "000000000...0"
+         * -- "+00000000...0"
+         * -- "-00000000...0"
+         * -- "~00000000...0"
+         * -- "~+0000000...0"
+         * -- "~-0000000...0"
+         *
+         * These variants must be reduce to "0" or "~0"
+         */
+        number->_is_exp_negative = False;
+        number->_has_period = False;
+        number->_has_endless_fract = False;
+
+        segment = (charptr) malloc(sizeof(char) * 5);
+
+        segment[0] = '0';
+        segment[1] = '0';
+        segment[2] = '0';
+        segment[3] = source[i - 1];
+        segment[4] = '\0';
+
+        number->_integer->push_front(number->_integer, segment);
+
+        return;
+    }
+
+
+    for (size_t k = i; k < len - 1; k++) {
+        if (source[k] == '.') {
+            j = k + 1;
+            break;
+        }
+    }
+
+
+    if (j) {    // if `source` has a fraction part. otherwise it hasn't or we don't know yet
+        /*
+         * `j`               - position in `source` where fraction part begins
+         * `j - 1`           - position in which `source[j - 1]` == '.'
+         * `j - 2`           - position, where integer part of number ends
+         * `(j - 2) - i + 1` - length of integer part
+         *
+         * Now we can define the integer part, starting from the end of it.
+         */
+        int iend = j - 2;
+
+        for (int k = iend; k >= (int) i; k -= 4) {
+            segment = (charptr) malloc(sizeof(char) * 5);
+
+            // `(j - 2) - k + 1` - integer part of the number that isn't in `number->_integer` yet
+
+            if ((k - i + 1) / 4 != 0) {
+                segment[0] = source[k - 3];
+                segment[1] = source[k - 2];
+                segment[2] = source[k - 1];
+                segment[3] = source[k];
+            } else {    // this is last `segment`
+                segment[0] = '0';
+
+                switch ((k - i + 1) % 4) {
+                    case 3:
+                        segment[1] = source[k - 2];
+                        segment[2] = source[k - 1];
+                        segment[3] = source[k];
+                        break;
+
+                    case 2:
+                        segment[1] = '0';
+                        segment[2] = source[k - 1];
+                        segment[3] = source[k];
+                        break;
+
+                    case 1:
+                        segment[1] = '0';
+                        segment[2] = '0';
+                        segment[3] = source[k];
+                        break;
+
+                    default:
+                        /* otherwise,  `(j - k - 1) % 4` == 0 => `(j - k - 1) / 4 != 0`*/
+                        break;
+                }
+            }
+
+            segment[4] = '\0';
+
+            printf("%s\n", segment);
+            printf("%c %c\n", source[9], source[j-3]);
+
+            number->_integer->push_front(number->_integer, segment);
+        }
+    }
+
+    printf("i = %d\n", i);
 }
 
 
-static void _number_len_6_and_more(Number number, const String source, size_t len) {
-    //
-}
-
-
-constructor_(Number)(const String number_in_string) {
+constructor_(Number)(const charptr number_in_string) {
     /*
      * Number constructor does not check whether parameter number_in_string
      * is entered correctly or not. This task falls to external code.
@@ -146,10 +305,10 @@ constructor_(Number)(const String number_in_string) {
 
     new_self_(Number);
 
-    self->_integer = new_(List_String)();
-    self->_fraction = new_(List_String)();
-    self->_period = new_(List_String)();
-    self->_exponent = new_(List_String)();
+    self->_integer = new_(List_charptr)();
+    self->_fraction = new_(List_charptr)();
+    self->_period = new_(List_charptr)();
+    self->_exponent = new_(List_charptr)();
 
     size_t len = strlen(number_in_string);
 
@@ -227,13 +386,13 @@ destructor_(Number) {
         free(self->_exponent->pop_back(self->_exponent));
     }
 
-    delete_List_String(self->_integer);
+    delete_List_charptr(self->_integer);
     self->_integer = NULL;
-    delete_List_String(self->_fraction);
+    delete_List_charptr(self->_fraction);
     self->_fraction = NULL;
-    delete_List_String(self->_period);
+    delete_List_charptr(self->_period);
     self->_period = NULL;
-    delete_List_String(self->_exponent);
+    delete_List_charptr(self->_exponent);
     self->_exponent = NULL;
 
     free(self);
