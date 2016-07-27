@@ -34,44 +34,105 @@ static Bool _add_four_digits(String res, const String op_1, const String op_2, B
 }
 
 
-static void _number_len_1(String buf, const String source) {
-    buf[0] = source[0];     // copy the digit
-    buf[1] = '\0';
+static void _number_len_1(Number number, const String source) {
+    /*
+     * If `len` == 1, then `number_in_string` holds only one digit (0-9),
+     * without any extra characters ('+', '-', '~', and so on). Otherwise,
+     * it's not a Number literal at all.
+     */
+
+    number->_is_negative = False;
+    number->_is_approximate = False;
+    number->_is_exp_negative = False;
+    number->_has_period = False;
+    number->_has_endless_fract = False;
+
+    String segment = (String) malloc(sizeof(char) * 5);
+
+    segment[0] = '0';
+    segment[1] = '0';
+    segment[2] = '0';
+    segment[3] = source[0];
+    segment[4] = '\0';
+
+    number->_integer->push_front(number->_integer, segment);
 }
 
 
-static void _number_len_2(String buf, Bool* negative, Bool* approximate, const String source) {
+static void _number_len_2(Number number, const String source) {
+    /*
+     * If `len` == 2, then `number_in_string` can contain extra characters
+     * at the beginning: '+', '-' or '~'. Sequence "-0"must be reduce to the "0".
+     */
+
+    number->_is_exp_negative = False;
+    number->_has_period = False;
+    number->_has_endless_fract = False;
+
+    String segment = (String) malloc(sizeof(char) * 5);
+
     switch (source[0]) {
         case '0':   // `source` == "0n" => "n"
         case '+':
-            *negative = False;
-            *approximate = False;
-            buf[0] = source[1];
-            buf[1] = '\0';
+            number->_is_negative = False;
+            number->_is_approximate = False;
+            segment[0] = '0';
+            segment[1] = '0';
+            segment[2] = '0';
+            segment[3] = source[1];
             break;
 
         case '-':
-            *negative = (source[1] == '0') ? False : True;  // if `source` == "-0" => "0"
-            *approximate = False;
-            buf[0] = source[1];
-            buf[1] = '\0';
+            number->_is_negative = (source[1] == '0') ? False : True;   // if `source` == "-0" => "0"
+            number->_is_approximate = False;
+            segment[0] = '0';
+            segment[1] = '0';
+            segment[2] = '0';
+            segment[3] = source[1];
             break;
 
         case '~':
-            *negative = False;
-            *approximate = True;
-            buf[0] = source[1];
-            buf[1] = '\0';
+            number->_is_negative = False;
+            number->_is_approximate = True;
+            segment[0] = '0';
+            segment[1] = '0';
+            segment[2] = '0';
+            segment[3] = source[1];
             break;
 
         default:    // `source` == "10".."99"
-            *negative = False;
-            *approximate = False;
-            buf[0] = source[0];
-            buf[1] = source[1];
-            buf[2] = '\0';
+            number->_is_negative = False;
+            number->_is_approximate = False;
+            segment[0] = '0';
+            segment[1] = '0';
+            segment[2] = source[0];
+            segment[3] = source[1];
             break;
     }
+
+    segment[4] = '\0';
+
+    number->_integer->push_front(number->_integer, segment);
+}
+
+
+static void _number_len_3(Number number, const String source) {
+    //
+}
+
+
+static void _number_len_4(Number number, const String source) {
+    //
+}
+
+
+static void _number_len_5(Number number, const String source) {
+    //
+}
+
+
+static void _number_len_6_and_more(Number number, const String source, size_t len) {
+    //
 }
 
 
@@ -90,19 +151,7 @@ constructor_(Number)(const String number_in_string) {
     self->_period = new_(List_String)();
     self->_exponent = new_(List_String)();
 
-    size_t  len = strlen(number_in_string);
-    String  buf = (String) malloc(sizeof(char) * len + 1);
-    /*
-     * `buf` holds only digit characters: both parts integer and fraction.
-     * If `number_in_string` is a sequence of digits ("8763548271"), then
-     * `buf` will be completely filled.
-     */
-
-    size_t  i = 0;              // `number_in_string` counter
-    size_t  j = 0;              // `buf` counter
-    char    c;                  // current character in `number_in_string`
-    Bool    has_fract = False;  // if the number has fraction part
-    size_t  fract_pos = 0;      // position where fraction part of number begins
+    size_t len = strlen(number_in_string);
 
     /*
      * If `len` == 1, then `number_in_string` holds only one digit (0-9),
@@ -113,14 +162,14 @@ constructor_(Number)(const String number_in_string) {
      * at the beginning: '+', '-' or '~'. Sequence "-0"must be reduce to the "0".
      *
      * If `len` >= 3, then `number_in_string` can be any of forms:
-     * -- integer:         "243"
-     * -- with '+':        "+10"
-     * -- negative:        "-56"
-     * -- real:            "0.1"
-     * -- approximate:     "~12"
-     * -- scientific:      "2e5"
-     * -- with separators: "1_0"
-     *                     "1`0"
+     * -- integer:              "243"
+     * -- with '+':             "+10"
+     * -- negative:             "-56"
+     * -- real:                 "0.1"
+     * -- approximate:          "~12"
+     * -- approx. and negative: "~-2"
+     * -- scientific:           "2e5"
+     * -- with separator:       "1_0"
      *
      * If `len` >= 5, then `number_in_string` can contain fraction part
      * with period: "0.(4)". Sequence "0.(0)" must be reduce to the "0".
@@ -131,158 +180,31 @@ constructor_(Number)(const String number_in_string) {
      * `number_in_string` can hold zeros at the beginning and at the end:
      * "04", "345.500", "-03". Sequence "-00000000" must be reduce to the "0".
      */
-    if (len == 1u) {
-        self->_is_negative = False;
-        self->_is_approximate = False;
-        self->_is_exp_negative = False;
-        self->_has_period = False;
-        self->_has_endless_fract = False;
+    switch (len) {
+        case 1u:
+            _number_len_1(self, number_in_string);
+            break;
 
-        _number_len_1(buf, number_in_string);
-    } else if (len == 2u) {
-        self->_is_exp_negative = False;
-        self->_has_period = False;
-        self->_has_endless_fract = False;
+        case 2u:
+            _number_len_2(self, number_in_string);
+            break;
 
-        _number_len_2(buf, &self->_is_negative, &self->_is_approximate, number_in_string);
+        case 3u:
+            _number_len_3(self, number_in_string);
+            break;
+
+        case 4u:
+            _number_len_4(self, number_in_string);
+            break;
+
+        case 5u:
+            _number_len_5(self, number_in_string);
+            break;
+
+        default:
+            _number_len_6_and_more(self, number_in_string, len);
+            break;
     }
-
-    printf("buf = %s\n", buf);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//    switch (len) {
-//        case 2:
-//            next_character:
-
-//            c = number_in_string[i];
-
-//            switch (c) {
-//                case '~':
-//                    self->_is_approximate = 1;
-//                    i++;
-//                    goto next_character;
-
-//                case '-':
-//                    self->_is_negative = 1;
-
-//                case '+':
-//                    i++;
-//                    break;
-
-//                default:
-//                    break;
-//            }
-
-//        default:
-//            for (; i < len; i++) {
-//                c = number_in_string[i];
-
-//                if (isdigit((int) c)) {
-//                    buf[j] = c;
-//                    j++;
-//                } else if (c == '.' && !has_fract) {
-//                    has_fract = 1;
-//                    fract_pos = j;
-//                } else {    // (c == '`') or (c == '_')
-//                    j++;
-//                }
-//            }
-//    }
-
-//    buf[j] = '\0';  // j - 1 is len of buf, where j - 1 <= len
-
-//    if (has_fract) {
-//        String segment;
-
-//        for (int k = (int) fract_pos - 1; k >= 0; k -= 4) {
-//            segment = (String) malloc(sizeof(char) * 5);
-//            segment[4] = '\0';
-
-//            if (k / 4 > 0) {
-//                segment[3] = buf[k];
-//                segment[2] = buf[k - 1];
-//                segment[1] = buf[k - 2];
-//                segment[0] = buf[k - 3];
-//            } else {
-//                switch (k % 4) {
-//                    case 3:
-//                        segment[3] = buf[k];
-//                        segment[2] = buf[k - 1];
-//                        segment[1] = buf[k - 2];
-//                        segment[0] = '0';
-//                        break;
-
-//                    case 2:
-//                        segment[3] = buf[k];
-//                        segment[2] = buf[k - 1];
-//                        segment[1] = '0';
-//                        segment[0] = '0';
-//                        break;
-
-//                    case 1:
-//                        segment[3] = buf[k];
-//                        segment[2] = '0';
-//                        segment[1] = '0';
-//                        segment[0] = '0';
-//                        break;
-//                }
-//            }
-
-//            self->_integer->push_front(self->_integer, segment);
-//        }
-
-//        for (size_t k = fract_pos; k < j; k += 4) {
-//            segment = (String) malloc(sizeof(char) * 5);
-//            segment[4] = '\0';
-
-//            if ((j - k) / 4 > 0) {
-//                segment[3] = buf[k];
-//                segment[2] = buf[k - 1];
-//                segment[1] = buf[k - 2];
-//                segment[0] = buf[k - 3];
-//            } else {
-//                switch (k % 4) {
-//                    case 3:
-//                        segment[3] = '0';
-//                        segment[2] = buf[k];
-//                        segment[1] = buf[k - 1];
-//                        segment[0] = buf[k - 2];
-//                        break;
-
-//                    case 2:
-//                        segment[3] = '0';
-//                        segment[2] = '0';
-//                        segment[1] = buf[k];
-//                        segment[0] = buf[k - 1];
-//                        break;
-
-//                    case 1:
-//                        segment[3] = '0';
-//                        segment[2] = '0';
-//                        segment[1] = '0';
-//                        segment[0] = buf[k];
-//                        break;
-//                }
-//            }
-
-//            self->_fraction->push_back(self->_fraction, segment);
-//        }
-//    }
-
-    free(buf);
 
     return self;
 }
@@ -324,7 +246,7 @@ void print_number(Number number) {
         printf("~");
     }
 
-    if (number->is_negative) {
+    if (number->_is_negative) {
         printf("-");
     }
 
@@ -332,9 +254,11 @@ void print_number(Number number) {
         printf("%s", number->_integer->at(number->_integer, i));
     }
 
-    printf(".");
+    if (!number->_fraction->is_empty) {
+        printf(".");
 
-    for (size_t i = 0; i < number->_fraction->_size; i++) {
-        printf("%s\n", number->_fraction->at(number->_fraction, i));
+        for (size_t i = 0; i < number->_fraction->_size; i++) {
+            printf("%s", number->_fraction->at(number->_fraction, i));
+        }
     }
 }

@@ -16,12 +16,30 @@ int main() {
 //    Number g = new_Number("~3.14");                 // approximate value
 //    Number h = new_Number("~-1_000_000`000.999");   // all inclusive
 
-//    print_number(a);
-//    print_number(b);
-//    print_number(c);
-//    print_number(d);
-//    print_number(e);
-//    print_number(f);
+    printf("a = ");
+    print_number(a);
+    puts("");
+
+    printf("b = ");
+    print_number(b);
+    puts("");
+
+    printf("c = ");
+    print_number(c);
+    puts("");
+
+    printf("d = ");
+    print_number(d);
+    puts("");
+
+    printf("e = ");
+    print_number(e);
+    puts("");
+
+    printf("f = ");
+    print_number(f);
+    puts("");
+
 //    print_number(g);
 //    print_number(h);
 
