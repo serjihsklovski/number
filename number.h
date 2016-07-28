@@ -29,6 +29,10 @@ cclass_(Number) {
     List(charptr)   _fraction;
     List(charptr)   _period;
     List(charptr)   _exponent;
+    size_t          _int_ghost_zeros;
+    size_t          _fract_ghost_zeros;
+    size_t          _per_ghost_zeros;
+    size_t          _exp_ghost_zeros;
 
     /* methods */
     method_def_(Number,     add,            Number) with_(Number other);

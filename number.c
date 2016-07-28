@@ -63,8 +63,7 @@ static size_t _remove_separators(charptr destination, const charptr source, size
 }
 
 
-static void _init_part(List_charptr lst, const charptr source, size_t begin, size_t end) {
-    // this loop removes zeros from the beginning
+static size_t _remove_zeros_begin(const charptr source, size_t begin, size_t end) {
     for (size_t i = begin; i < end; i++) {
         if (source[i] == '0') {
             begin++;
@@ -73,20 +72,47 @@ static void _init_part(List_charptr lst, const charptr source, size_t begin, siz
         }
     }
 
+    return begin;
+}
+
+
+static size_t _remove_zeros_end(const charptr source, size_t begin, size_t end) {
+    for (size_t i = end - 1; i > begin; i--) {
+        if (source[i] == '0') {
+            end--;
+        } else {
+            break;
+        }
+    }
+
+    return end;
+}
+
+
+static size_t _init_part(List_charptr lst, const charptr source, size_t begin, size_t end) {
     charptr segment;
     size_t  length = end - begin;
     size_t  rem = length % 4;
+    size_t  ghost_zeros = 0;    // this is a count of beginning zeros in 1st segment, that won't be displayed
 
     if (rem) {
         segment = (charptr) malloc(sizeof(char) * 5);
         segment[0] = '0';
+        ghost_zeros++;
 
         if (rem > 1) {
-            segment[1] = (rem == 3) ? source[begin++] : '0';
+            if (rem > 2) {
+                segment[1] = source[begin++];
+            } else {
+                segment[1] = '0';
+                ghost_zeros++;
+            }
+
             segment[2] = source[begin++];
         } else {
             segment[1] = '0';
             segment[2] = '0';
+            ghost_zeros += 2;
         }
 
         segment[3] = source[begin++];
@@ -106,20 +132,14 @@ static void _init_part(List_charptr lst, const charptr source, size_t begin, siz
 
         lst->push_back(lst, segment);
     }
+
+    return ghost_zeros;     // it can be 0, 1, 2 or 3
 }
 
 
 static void _init_fraction_part(Number number, const charptr source, size_t begin, size_t end) {
-    // next loop removes zeros from the end
-    for (size_t i = end - 1; i > begin; i--) {
-        if (source[i] == '0') {
-            end--;
-        } else {
-            break;
-        }
-    }
-
-    _init_part(number->_fraction, source, begin, end);
+    end = _remove_zeros_end(source, begin, end);
+    number->_fract_ghost_zeros = _init_part(number->_fraction, source, begin, end);
 }
 
 
@@ -134,7 +154,7 @@ static void _init_exponent_part(Number number, const charptr source, size_t begi
         number->_is_exp_negative = False;
     }
 
-    _init_part(number->_exponent, source, begin, end);
+    number->_exp_ghost_zeros = _init_part(number->_exponent, source, begin, end);
 }
 
 
@@ -191,13 +211,15 @@ static void _init_number(Number number, const charptr source, size_t length) {
         number->_is_negative = False;
     }
 
+    int_pos = _remove_zeros_begin(source, int_pos, length);     // "000000" => ""
+
     if (_has_fraction_and_exponent(source, int_pos, length - 1, &fract_pos, &exp_pos))
     {                               // `number` has integer, exponent, and fraction parts ("212.12414e124124")
-        _init_part(number->_integer, source, int_pos, fract_pos - 2);
+        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, fract_pos - 2);
         _init_fraction_part(number, source, fract_pos, exp_pos - 2);
         _init_exponent_part(number, source, exp_pos, length);
     } else if (exp_pos) {           // `number` has integer and exponent parts ("1231e5344")
-        _init_part(number->_integer, source, int_pos, exp_pos - 2);
+        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, exp_pos - 2);
         _init_exponent_part(number, source, exp_pos, length);
     } else if (fract_pos) {         // `number` has integer and fraction parts ("2355.5645", "2344.45(44345)", "123.342...")
         number->_is_exp_negative = False;
@@ -210,12 +232,12 @@ static void _init_number(Number number, const charptr source, size_t length) {
 //            // fraction part is endless?
 //        }
 
-        _init_part(number->_integer, source, int_pos, fract_pos - 1);
+        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, fract_pos - 1);
         _init_fraction_part(number, source, fract_pos, length);
     } else {                        // `number` has only integer part ("2353425678")
         number->_is_exp_negative = False;
         number->_has_endless_fract = False;
-        _init_part(number->_integer, source, int_pos, length);
+        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, length);
     }
 }
 
@@ -312,17 +334,41 @@ void print_number(Number number) {
         printf("-");
     }
 
+    Node_charptr* node;
+    size_t i;
+
     if (!number->_integer->is_empty(number->_integer)) {
-        for (size_t i = 0; i < number->_integer->_size; i++) {
-            printf("%s", number->_integer->at(number->_integer, i));
+        node = number->_integer->_head;
+        i = 0;
+
+        printf("%s", node->_data + number->_int_ghost_zeros);
+
+        for (node = number->_integer->_head->_next; node != NULL; node = node->_next) {
+            printf("%s", node->_data);
         }
 
         if (!number->_fraction->is_empty(number->_fraction)) {
             printf(".");
 
-            for (size_t i = 0; i < number->_fraction->_size; i++) {
-                printf("%s", number->_fraction->at(number->_fraction, i));
+            node = number->_fraction->_head;
+            i = 0;
+
+            printf("%s", node->_data + number->_fract_ghost_zeros);
+
+            for (node = number->_fraction->_head->_next; node != NULL; node = node->_next) {
+                printf("%s", node->_data);
             }
+        }
+    } else if (!number->_fraction->is_empty(number->_fraction)) {
+        printf("0.");
+
+        node = number->_fraction->_head;
+        i = 0;
+
+        printf("%s", node->_data + number->_fract_ghost_zeros);
+
+        for (node = number->_fraction->_head->_next; node != NULL; node = node->_next) {
+            printf("%s", node->_data);
         }
     } else {
         printf("0");
