@@ -4,11 +4,38 @@
 #include <ctype.h>
 
 
-static size_t _has_fraction(const charptr source, size_t begin, size_t end) {
+static Bool _has_fraction_and_exponent(const charptr    source,
+                                       size_t           begin,
+                                       size_t           end,
+                                       size_t*          fract_pos,
+                                       size_t*          exp_pos)
+{
+    *fract_pos = 0u;
+    *exp_pos = 0u;
+
+    size_t i;
+
+    for (i = begin; i < end; i++) {
+        if (source[i] == '.') {
+            *fract_pos = i + 1;
+            break;
+        }
+    } for (i = *fract_pos + 1; i < end; i++) {
+        if (source[i] == 'e' || source[i] == 'E') {
+            *exp_pos = i + 1;
+            break;
+        }
+    }
+
+    return *fract_pos && *exp_pos;
+}
+
+
+static size_t _has_period(const charptr source, size_t begin, size_t end) {
     size_t pos = 0;
 
     for (size_t i = begin; i < end; i++) {
-        if (source[i] == '.') {
+        if (source[i] == '(') {
             pos = i + 1;
             break;
         }
@@ -30,45 +57,84 @@ static size_t _remove_separators(charptr destination, const charptr source, size
         }
     }
 
+    destination[new_length] = '\0';
+
     return new_length;
 }
 
 
-static void _init_integer_part(Number number, const charptr source, size_t begin, size_t end) {
-    int     _end = (int) end;
-    int     _begin = (int) begin;
-    int     _length;
-    int     _rem;
-    charptr _segment;
+static void _init_part(List_charptr lst, const charptr source, size_t begin, size_t end) {
+    // this loop removes zeros from the beginning
+    for (size_t i = begin; i < end; i++) {
+        if (source[i] == '0') {
+            begin++;
+        } else {
+            break;
+        }
+    }
 
-    for (int i = _end; i >= _begin; i -= 4) {
-        _segment = (charptr) malloc(sizeof(char) * 5);
-        _length = i - _begin + 1;
+    charptr segment;
+    size_t  length = end - begin;
+    size_t  rem = length % 4;
 
-        if (_length / 4 != 0) {
-            _segment[0] = source[i - 3];
-            _segment[1] = source[i - 2];
-            _segment[2] = source[i - 1];
-            _segment[3] = source[i];
-        } else {    // this is last `_segment`
-            _segment[0] = '0';
-            _rem = _length % 4;
+    if (rem) {
+        segment = (charptr) malloc(sizeof(char) * 5);
+        segment[0] = '0';
 
-            if (_rem > 1) {
-                _segment[1] = (_rem == 3) ? source[i - 2] : '0';
-                _segment[2] = source[i - 1];
-            } else {
-                _segment[1] = '0';
-                _segment[2] = '0';
-            }
-
-            _segment[3] = source[i];
+        if (rem > 1) {
+            segment[1] = (rem == 3) ? source[begin++] : '0';
+            segment[2] = source[begin++];
+        } else {
+            segment[1] = '0';
+            segment[2] = '0';
         }
 
-        _segment[4] = '\0';
+        segment[3] = source[begin++];
+        segment[4] = '\0';
 
-        number->_integer->push_front(number->_integer, _segment);
+        lst->push_back(lst, segment);
     }
+
+    for (size_t i = begin; i < end; i += 4) {
+        segment = (charptr) malloc(sizeof(char) * 5);
+
+        for (size_t j = 0; j < 4; j++) {
+            segment[j] = source[i + j];
+        }
+
+        segment[4] = '\0';
+
+        lst->push_back(lst, segment);
+    }
+}
+
+
+static void _init_fraction_part(Number number, const charptr source, size_t begin, size_t end) {
+    // next loop removes zeros from the end
+    for (size_t i = end - 1; i > begin; i--) {
+        if (source[i] == '0') {
+            end--;
+        } else {
+            break;
+        }
+    }
+
+    _init_part(number->_fraction, source, begin, end);
+}
+
+
+static void _init_exponent_part(Number number, const charptr source, size_t begin, size_t end) {
+    if (source[begin] == '+') {
+        number->_is_exp_negative = False;
+        begin++;
+    } else if (source[begin] == '-') {
+        number->_is_exp_negative = True;
+        begin++;
+    } else {
+        number->_is_exp_negative = False;
+    }
+
+    _init_part(number->_exponent, source, begin, end);
 }
 
 
@@ -103,10 +169,10 @@ static Bool _add_four_digits(charptr res, const charptr op_1, const charptr op_2
 
 
 static void _init_number(Number number, const charptr source, size_t length) {
-    charptr segment;
-    size_t  int_pos = 0;    // position in `source`, where integer part begins
-    size_t  fract_pos = 0;  // position in `source`, where fraction part begins
-    size_t  exp_pos = 0;    // position in `source`, where exponent part begins
+    size_t int_pos = 0;     // position in `source`, where integer part begins
+    size_t fract_pos = 0;   // position in `source`, where fraction part begins
+    size_t per_pos = 0;     // position in `source`, where period of fraction begins
+    size_t exp_pos = 0;     // position in `source`, where exponent part begins
 
     if (source[int_pos] == '~') {
         number->_is_approximate = True;
@@ -125,64 +191,31 @@ static void _init_number(Number number, const charptr source, size_t length) {
         number->_is_negative = False;
     }
 
-    for (size_t i = int_pos; i < length; i++) {
-        if (source[i] == '0') {
-            int_pos++;
-        } else if (source[i] == '.') {      // 0.nnnnnn
-            fract_pos = i + 1;  // fration part begins here
-            int_pos--;
-            break;
-        } else {
-            break;
-        }
-    } if (int_pos == length) {
-        /*
-         * `source` can be:
-         * -- "000000000...0"
-         * -- "+00000000...0"
-         * -- "-00000000...0"
-         * -- "~00000000...0"
-         * -- "~+0000000...0"
-         * -- "~-0000000...0"
-         *
-         * These variants must be reduce to "0" or "~0"
-         */
-        number->_is_negative = False;
+    if (_has_fraction_and_exponent(source, int_pos, length - 1, &fract_pos, &exp_pos))
+    {                               // `number` has integer, exponent, and fraction parts ("212.12414e124124")
+        _init_part(number->_integer, source, int_pos, fract_pos - 2);
+        _init_fraction_part(number, source, fract_pos, exp_pos - 2);
+        _init_exponent_part(number, source, exp_pos, length);
+    } else if (exp_pos) {           // `number` has integer and exponent parts ("1231e5344")
+        _init_part(number->_integer, source, int_pos, exp_pos - 2);
+        _init_exponent_part(number, source, exp_pos, length);
+    } else if (fract_pos) {         // `number` has integer and fraction parts ("2355.5645", "2344.45(44345)", "123.342...")
         number->_is_exp_negative = False;
-        number->_has_period = False;
+
+//        per_pos = _has_period(source, fract_pos, length - 2);
+
+//        if (per_pos) {
+//            _init_part(number->_period, source, per_pos, length - 1);
+//        } else {
+//            // fraction part is endless?
+//        }
+
+        _init_part(number->_integer, source, int_pos, fract_pos - 1);
+        _init_fraction_part(number, source, fract_pos, length);
+    } else {                        // `number` has only integer part ("2353425678")
+        number->_is_exp_negative = False;
         number->_has_endless_fract = False;
-
-        segment = (charptr) malloc(sizeof(char) * 5);
-
-        segment[0] = '0';
-        segment[1] = '0';
-        segment[2] = '0';
-        segment[3] = source[int_pos - 1];
-        segment[4] = '\0';
-
-        number->_integer->push_front(number->_integer, segment);
-
-        return;
-    }
-
-    fract_pos = (!fract_pos) ? _has_fraction(source, int_pos, length - 1) : 0;
-
-    // Now we can define the integer part, starting from the end of it.
-    if (fract_pos) {    // if `source` has a fraction part
-        /*
-         * `int_pos`       - position in `source` where integer part begins
-         * `fract_pos`     - position in `source` where fraction part begins
-         * `fract_pos - 1` - position in which `source[j - 1]` == '.'
-         * `fract_pos - 2` - position, where integer part of `number` ends
-         */
-        _init_integer_part(number, source, int_pos, fract_pos - 2);
-    } else {    // else the `number` hasn't fraction part
-        /*
-         * `int_pos`    - position in `source` where integer part begins
-         * `length`     - length of `source`
-         * `length - 1` - position in `source` where integer part ends
-         */
-        _init_integer_part(number, source, int_pos, length - 1);
+        _init_part(number->_integer, source, int_pos, length);
     }
 }
 
@@ -279,15 +312,19 @@ void print_number(Number number) {
         printf("-");
     }
 
-    for (size_t i = 0; i < number->_integer->_size; i++) {
-        printf("%s", number->_integer->at(number->_integer, i));
-    }
-
-    if (!number->_fraction->is_empty) {
-        printf(".");
-
-        for (size_t i = 0; i < number->_fraction->_size; i++) {
-            printf("%s", number->_fraction->at(number->_fraction, i));
+    if (!number->_integer->is_empty(number->_integer)) {
+        for (size_t i = 0; i < number->_integer->_size; i++) {
+            printf("%s", number->_integer->at(number->_integer, i));
         }
+
+        if (!number->_fraction->is_empty(number->_fraction)) {
+            printf(".");
+
+            for (size_t i = 0; i < number->_fraction->_size; i++) {
+                printf("%s", number->_fraction->at(number->_fraction, i));
+            }
+        }
+    } else {
+        printf("0");
     }
 }

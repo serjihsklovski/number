@@ -24,7 +24,6 @@ cclass_(Number) {
     Bool            _is_negative;
     Bool            _is_approximate;
     Bool            _is_exp_negative;
-    Bool            _has_period;
     Bool            _has_endless_fract;
     List(charptr)   _integer;
     List(charptr)   _fraction;
