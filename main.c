@@ -11,7 +11,7 @@ int main() {
     Number f = new_Number("~4532");
     Number g = new_Number("-4124532521");
     Number h = new_Number("~-000000_0");*/
-    Number i = new_Number("~-0.13451214100000043523452634234523522342342342342234234234234234433452353333");
+    Number i = new_Number("0.000(03000)");
 //    Number j = new_Number("~00000000000");
 
     printf("a = ");

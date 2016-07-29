@@ -223,17 +223,16 @@ static void _init_number(Number number, const charptr source, size_t length) {
         _init_exponent_part(number, source, exp_pos, length);
     } else if (fract_pos) {         // `number` has integer and fraction parts ("2355.5645", "2344.45(44345)", "123.342...")
         number->_is_exp_negative = False;
-
-//        per_pos = _has_period(source, fract_pos, length - 2);
-
-//        if (per_pos) {
-//            _init_part(number->_period, source, per_pos, length - 1);
-//        } else {
-//            // fraction part is endless?
-//        }
-
         number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, fract_pos - 1);
-        _init_fraction_part(number, source, fract_pos, length);
+        per_pos = _has_period(source, fract_pos, length - 2);
+
+        if (per_pos) {      // `number` has integer, fraction and period parts ("1231.123(35326)", "12413.(12314)")
+            number->_fract_ghost_zeros = _init_part(number->_fraction, source, fract_pos, per_pos - 1);
+            number->_per_ghost_zeros = _init_part(number->_period, source, per_pos, length - 1);
+        } else {            // `number` has only integer + fraction parts. fraction can be endless ("123.3423", "123.1332...")
+            number->_has_endless_fract = source[length - 1] == '.';
+            _init_fraction_part(number, source, fract_pos, number->_has_endless_fract ? (length - 3) : length);
+        }
     } else {                        // `number` has only integer part ("2353425678")
         number->_is_exp_negative = False;
         number->_has_endless_fract = False;
@@ -335,23 +334,24 @@ void print_number(Number number) {
     }
 
     Node_charptr* node;
-    size_t i;
 
     if (!number->_integer->is_empty(number->_integer)) {
         node = number->_integer->_head;
-        i = 0;
 
         printf("%s", node->_data + number->_int_ghost_zeros);
 
         for (node = number->_integer->_head->_next; node != NULL; node = node->_next) {
             printf("%s", node->_data);
         }
+    } else {
+        printf("0");
+    }
+
+    if (!number->_fraction->is_empty(number->_fraction) || !number->_period->is_empty(number->_period)) {
+        printf(".");
 
         if (!number->_fraction->is_empty(number->_fraction)) {
-            printf(".");
-
             node = number->_fraction->_head;
-            i = 0;
 
             printf("%s", node->_data + number->_fract_ghost_zeros);
 
@@ -359,18 +359,19 @@ void print_number(Number number) {
                 printf("%s", node->_data);
             }
         }
-    } else if (!number->_fraction->is_empty(number->_fraction)) {
-        printf("0.");
 
-        node = number->_fraction->_head;
-        i = 0;
 
-        printf("%s", node->_data + number->_fract_ghost_zeros);
+        if (!number->_period->is_empty(number->_period)) {
+            printf("(%s", number->_period->_head->_data + number->_per_ghost_zeros);
 
-        for (node = number->_fraction->_head->_next; node != NULL; node = node->_next) {
-            printf("%s", node->_data);
+            for (node = number->_period->_head->_next; node != NULL; node = node->_next) {
+                printf("%s", node->_data);
+            }
+
+            printf(")");
+        } else if (number->_has_endless_fract) {
+            printf("...");
         }
-    } else {
-        printf("0");
     }
 }
+
