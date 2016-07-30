@@ -3,7 +3,7 @@
 
 
 int main() {
-    Number a = new_Number("~-0000244");/*
+    Number a = new_Number("~-244e12");/*
     Number b = new_Number("06");
     Number c = new_Number("+94");
     Number d = new_Number("-534");
@@ -11,7 +11,7 @@ int main() {
     Number f = new_Number("~4532");
     Number g = new_Number("-4124532521");
     Number h = new_Number("~-000000_0");*/
-    Number i = new_Number("0.000(03000)");
+    Number i = new_Number("4.9(0000000)");
 //    Number j = new_Number("~00000000000");
 
     printf("a = ");

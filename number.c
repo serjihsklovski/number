@@ -31,8 +31,19 @@ static Bool _has_fraction_and_exponent(const charptr    source,
 }
 
 
+static Bool _all_ch(char ch, const charptr source, size_t begin, size_t end) {
+    for (size_t i = begin; i < end; i++) {
+        if (source[i] != ch) {
+            return False;
+        }
+    }
+
+    return True;
+}
+
+
 static size_t _has_period(const charptr source, size_t begin, size_t end) {
-    size_t pos = 0;
+    size_t  pos = 0;
 
     for (size_t i = begin; i < end; i++) {
         if (source[i] == '(') {
@@ -215,25 +226,32 @@ static void _init_number(Number number, const charptr source, size_t length) {
 
     if (_has_fraction_and_exponent(source, int_pos, length - 1, &fract_pos, &exp_pos))
     {                               // `number` has integer, exponent, and fraction parts ("212.12414e124124")
-        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, fract_pos - 2);
-        _init_fraction_part(number, source, fract_pos, exp_pos - 2);
+        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, fract_pos - 1);
+        _init_fraction_part(number, source, fract_pos, exp_pos - 1);
         _init_exponent_part(number, source, exp_pos, length);
     } else if (exp_pos) {           // `number` has integer and exponent parts ("1231e5344")
-        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, exp_pos - 2);
+        number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, exp_pos - 1);
         _init_exponent_part(number, source, exp_pos, length);
     } else if (fract_pos) {         // `number` has integer and fraction parts ("2355.5645", "2344.45(44345)", "123.342...")
         number->_is_exp_negative = False;
         number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, fract_pos - 1);
-        per_pos = _has_period(source, fract_pos, length - 2);
+        per_pos = _has_period(source, fract_pos, length - 1);
+
+        printf("period is empty = %d\n", number->_period->is_empty(number->_period));
+        printf("per_pos = %d\n", per_pos);
 
         if (per_pos) {      // `number` has integer, fraction and period parts ("1231.123(35326)", "12413.(12314)")
             number->_fract_ghost_zeros = _init_part(number->_fraction, source, fract_pos, per_pos - 1);
-            number->_per_ghost_zeros = _init_part(number->_period, source, per_pos, length - 1);
+
+            if (!_all_ch('0', source, per_pos, length - 1)) {
+                number->_per_ghost_zeros = _init_part(number->_period, source, per_pos, length - 1);
+            }
         } else {            // `number` has only integer + fraction parts. fraction can be endless ("123.3423", "123.1332...")
             number->_has_endless_fract = source[length - 1] == '.';
             _init_fraction_part(number, source, fract_pos, number->_has_endless_fract ? (length - 3) : length);
+            printf("%d\n", number->_period->is_empty(number->_period));
         }
-    } else {                        // `number` has only integer part ("2353425678")
+    } else {                // `number` has only integer part ("2353425678")
         number->_is_exp_negative = False;
         number->_has_endless_fract = False;
         number->_int_ghost_zeros = _init_part(number->_integer, source, int_pos, length);
@@ -371,6 +389,22 @@ void print_number(Number number) {
             printf(")");
         } else if (number->_has_endless_fract) {
             printf("...");
+        }
+    }
+
+    if (!number->_exponent->is_empty(number->_exponent)) {
+        printf("e");
+
+        if (number->_is_exp_negative) {
+            printf("-");
+        }
+
+        node = number->_exponent->_head;
+
+        printf("%s", node->_data + number->_exp_ghost_zeros);
+
+        for (node = number->_exponent->_head->_next; node != NULL; node = node->_next) {
+            printf("%s", node->_data);
         }
     }
 }
